@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link
+      href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css"
+      rel="stylesheet"
+    />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui"
+    />
+    <title>kjsq - produce kafka messages</title>
+  </head>
+  <body>
+    <div id="app">
+      <v-app id="inspire">
+        <v-app-bar app clipped-left>
+          <v-toolbar-title>kjsq</v-toolbar-title>
+        </v-app-bar>
+
+        <v-content>
+          <v-container>
+            <v-row>
+              <v-col cols="3" sm="12" md="3">
+                <v-text-field
+                  label="Brokers"
+                  placeholder="broker1:9092,broker2:9092,..."
+                  v-model="brokers"
+                  outlined
+                ></v-text-field>
+              </v-col>
+              <v-col cols="3" sm="12" md="3">
+                <v-text-field
+                  label="Topic"
+                  placeholder="Kafka Topic"
+                  v-model="topic"
+                  outlined
+                ></v-text-field>
+              </v-col>
+              <v-col cols="2" sm="12" md="2" offset="4">
+                <v-btn color="warning" dark @click="send">Send</v-btn>
+              </v-col>
+              <v-alert v-if="alert.text" :type="alert.color">
+                {{ alert.text }}
+              </v-alert>
+              <v-col cols="12" sm="12" md="12">
+                <v-textarea
+                  filled
+                  no-resize
+                  height="70vh"
+                  label="Messages"
+                  v-model="messages"
+                >
+                </v-textarea>
+              </v-col>
+            </v-row>
+          </v-container>
+        </v-content>
+      </v-app>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <script>
+      new Vue({
+        el: "#app",
+        vuetify: new Vuetify(),
+        data: () => ({
+          brokers: "",
+          topic: "",
+          rawMessages: "[\n\n]",
+          alert: {
+            text: "",
+            color: "",
+          },
+        }),
+        computed: {
+          messages: {
+            get() {
+              return this.rawMessages;
+            },
+            set(val) {
+              this.rawMessages = JSON.stringify(JSON.parse(val), null, 2);
+            },
+          },
+        },
+        created() {
+          this.$vuetify.theme.dark = true;
+        },
+        methods: {
+          send() {
+            axios
+              .post("/api/produce", {
+                kafkaHost: this.brokers,
+                topic: this.topic,
+                messages: JSON.parse(this.rawMessages),
+              })
+              .then(({ data }) => {
+                this.alert.text = data.state.status;
+                this.alert.color = "info";
+                const interval = setInterval(() => {
+                  axios
+                    .get("/api/state/" + data.id)
+                    .then(({ data }) => {
+                      if (data.status === "errored" || data.status === "done") {
+                        clearInterval(interval);
+                      }
+                      this.alert.text =
+                        data.status +
+                        `, sent ${data.messagesAcked.length} messages`;
+                      this.alert.color = "info";
+                    })
+                    .catch((err) => {
+                      clearInterval(interval);
+                      this.alert.text = err.toString();
+                      this.alert.color = "error";
+                    });
+                }, 1000);
+              })
+              .catch((err) => {
+                this.alert.text = err.toString();
+                this.alert.color = "error";
+              });
+          },
+        },
+      });
+    </script>
+  </body>
+</html>

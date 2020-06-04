@@ -5,6 +5,7 @@ const kafka = require("kafka-node"),
 
 const app = express();
 app.use(bodyParser.json());
+app.use("/", express.static("web"));
 
 class Publisher {
   constructor(kafkaHost, topic) {
@@ -116,7 +117,7 @@ class QueueContainer {
 
 const store = {};
 
-app.post("/produce", async (req, res) => {
+app.post("/api/produce", async (req, res) => {
   const queue = req.body;
   if (typeof queue !== "object") {
     await res.status(400).send("kafkaHost, messages and topic are required");
@@ -143,7 +144,7 @@ app.post("/produce", async (req, res) => {
   });
 });
 
-app.get("/state/:id", (req, res) => {
+app.get("/api/state/:id", (req, res) => {
   if (req.params.id in store) {
     res.send(store[req.params.id].getState());
   } else {
