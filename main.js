@@ -1,7 +1,24 @@
 const kafka = require("kafka-node"),
   express = require("express"),
   bodyParser = require("body-parser"),
+  sqlite3 = require("sqlite3").verbose(),
   { uuid } = require("uuidv4");
+
+const dbPath = process.env.DBPATH || "streams.db";
+
+const db = new sqlite3.Database(dbPath);
+
+db.run(
+  `CREATE TABLE IF NOT EXISTS streams (
+  name TEXT NOT NULL PRIMARY KEY,
+  kafkaHost TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  messages TEXT NOT NULL
+);`,
+  (err) => {
+    if (err) throw err;
+  }
+);
 
 const app = express();
 app.use(bodyParser.json());
@@ -117,22 +134,69 @@ class QueueContainer {
 
 const store = {};
 
-app.post("/api/produce", async (req, res) => {
-  const queue = req.body;
+function invalidQueue(queue) {
   if (typeof queue !== "object") {
-    await res.status(400).send("kafkaHost, messages and topic are required");
-    return;
+    return "kafkaHost, messages and topic are required";
   }
   if (!queue.kafkaHost) {
-    await res.status(400).send("kafkaHost is required");
-    return;
+    return "kafkaHost is required";
   }
   if (!queue.messages || !queue.messages.length) {
-    await res.status(400).send("at least one message is required");
-    return;
+    return "at least one message is required";
   }
   if (!queue.topic) {
-    await res.status(400).send("topic is required");
+    return "topic is required";
+  }
+}
+
+app.post("/api/streams/save", async (req, res) => {
+  const queue = req.body;
+  if ((msg = invalidQueue(queue))) {
+    await res.status(400).send(msg);
+    return;
+  }
+  if (!queue.name) {
+    await res.status(400).send("name is required");
+    return;
+  }
+  const stmt = db.prepare("INSERT INTO streams VALUES (?, ?, ?, ?)");
+  stmt.run(
+    queue.name,
+    queue.kafkaHost,
+    queue.topic,
+    JSON.stringify(queue.messages)
+  );
+  stmt.finalize();
+  res.send("ok");
+});
+
+app.get("/api/streams/:name", async (req, res) => {
+  const name = req.params.name;
+  const stmt = db.prepare("SELECT * FROM streams WHERE name = ?");
+  stmt.run(name);
+  stmt.each(
+    (err, row) => {
+      if (err) {
+        res.status(500).send(err);
+      } else {
+        row.messages = JSON.parse(row.messages);
+        res.send(row);
+      }
+    },
+    (err, count) => {
+      if (err) {
+        res.status(500).send(err);
+      } else if (count === 0) {
+        res.status(404).send("not found");
+      }
+    }
+  );
+});
+
+app.post("/api/streams/produce", async (req, res) => {
+  const queue = req.body;
+  if ((msg = invalidQueue(queue))) {
+    await res.status(400).send(msg);
     return;
   }
   const id = uuid();
@@ -144,7 +208,7 @@ app.post("/api/produce", async (req, res) => {
   });
 });
 
-app.get("/api/state/:id", (req, res) => {
+app.get("/api/streams/state/:id", (req, res) => {
   if (req.params.id in store) {
     res.send(store[req.params.id].getState());
   } else {
@@ -152,7 +216,7 @@ app.get("/api/state/:id", (req, res) => {
   }
 });
 
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.listen(port, function () {
   console.log(`Starting HTTP server on port: ${port}`);

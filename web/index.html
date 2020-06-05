@@ -100,7 +100,7 @@
         methods: {
           send() {
             axios
-              .post("/api/produce", {
+              .post("/api/streams/produce", {
                 kafkaHost: this.brokers,
                 topic: this.topic,
                 messages: JSON.parse(this.rawMessages),
@@ -110,7 +110,7 @@
                 this.alert.color = "info";
                 const interval = setInterval(() => {
                   axios
-                    .get("/api/state/" + data.id)
+                    .get("/api/streams/state/" + data.id)
                     .then(({ data }) => {
                       if (data.status === "errored" || data.status === "done") {
                         clearInterval(interval);
