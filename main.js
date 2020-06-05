@@ -149,25 +149,36 @@ function invalidQueue(queue) {
   }
 }
 
-app.post("/api/streams/save", async (req, res) => {
+app.post("/api/streams/save", (req, res) => {
   const queue = req.body;
   if ((msg = invalidQueue(queue))) {
-    await res.status(400).send(msg);
+    res.status(400).send(msg);
     return;
   }
   if (!queue.name) {
-    await res.status(400).send("name is required");
+    res.status(400).send("name is required");
     return;
   }
-  const stmt = db.prepare("INSERT INTO streams VALUES (?, ?, ?, ?)");
+  let hadError = false;
+  const stmt = db.prepare("REPLACE INTO streams VALUES (?, ?, ?, ?)");
   stmt.run(
-    queue.name,
-    queue.kafkaHost,
-    queue.topic,
-    JSON.stringify(queue.messages)
+    [queue.name, queue.kafkaHost, queue.topic, JSON.stringify(queue.messages)],
+    (err) => {
+      if (err && !hadError) {
+        hadError = true;
+        res.status(500).send(err);
+      }
+    }
   );
-  stmt.finalize();
-  res.send("ok");
+  stmt.finalize((err) => {
+    if (err && !hadError) {
+      hadError = true;
+      res.status(500).send(err);
+    }
+  });
+  if (!hadError) {
+    res.send("ok");
+  }
 });
 
 app.get("/api/streams/:name", async (req, res) => {

@@ -70,10 +70,10 @@ Try it yourself!
 
 If you prefer you can use the REST api instead of the web.
 
-POST `/api/produce`
+POST `/api/streams/produce`
 
 ```js
-POST `/api/produce` {
+POST `/api/streams/produce` {
     "kafkaHost": "broker1:9092,broker2:9092",
     "topic": "test_topic",
     "messages": [
@@ -107,10 +107,74 @@ Response
 }
 ```
 
-GET `/api/state/:id`
+POST `/api/streams/save`
 
 ```js
-GET `/api/state/d4c93279-b3ab-4695-9688-76a2de184e28`
+POST `/api/streams/save` {
+    "name": "test",
+    "kafkaHost": "broker1:9092,broker2:9092",
+    "topic": "test_topic",
+    "messages": [
+        {
+            "key": 1,
+            "payload": {
+                "id": 1,
+                "name": "John Doe"
+            }
+        },
+        10000,
+        {
+            "key": 2,
+            "payload": {
+                "id": 2,
+                "name": "Alice"
+            }
+        },
+        3000,
+        "Bob"
+    ]
+}
+
+Response
+"ok"
+```
+
+GET `/api/streams/:name`
+
+```js
+GET `/api/streams/test`
+
+Response
+{
+    "kafkaHost": "broker1:9092,broker2:9092",
+    "topic": "test_topic",
+    "messages": [
+        {
+            "key": 1,
+            "payload": {
+                "id": 1,
+                "name": "John Doe"
+            }
+        },
+        10000,
+        {
+            "key": 2,
+            "payload": {
+                "id": 2,
+                "name": "Alice"
+            }
+        },
+        3000,
+        "Bob"
+    ]
+}
+```
+
+
+GET `/api/streams/state/:id`
+
+```js
+GET `/api/streams/state/d4c93279-b3ab-4695-9688-76a2de184e28`
 
 Response
 {
