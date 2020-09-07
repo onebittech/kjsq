@@ -66,7 +66,7 @@ class Publisher {
         [
           {
             topic: this.topic,
-            messages: [msg.payload ? msg.payload : msg],
+            messages: [msg.payload ? JSON.stringify(msg.payload) : msg],
             key: msg.key ? msg.key : "0",
           },
         ],
